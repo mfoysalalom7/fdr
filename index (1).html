@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Facebook Report AI</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #0f1117; color: #e8eaed; min-height: 100vh; }
+  header { background: #1877f2; padding: 16px 24px; display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 20px; font-weight: 700; }
+  header span { font-size: 13px; opacity: 0.8; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 24px; background: #1a1d27; padding: 4px; border-radius: 10px; }
+  .tab { flex: 1; padding: 10px; text-align: center; cursor: pointer; border-radius: 8px; font-size: 14px; color: #9aa0a6; transition: all 0.2s; border: none; background: transparent; }
+  .tab.active { background: #1877f2; color: white; font-weight: 600; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .card { background: #1a1d27; border-radius: 12px; padding: 20px; margin-bottom: 16px; border: 1px solid #2d3142; }
+  .card h3 { font-size: 15px; font-weight: 600; margin-bottom: 16px; color: #c9d1d9; }
+  input, select { width: 100%; padding: 10px 14px; background: #0f1117; border: 1px solid #2d3142; border-radius: 8px; color: #e8eaed; font-size: 14px; margin-bottom: 12px; }
+  input:focus, select:focus { outline: none; border-color: #1877f2; }
+  button.btn { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.2s; }
+  button.btn-primary { background: #1877f2; color: white; width: 100%; }
+  button.btn-primary:hover { background: #166fe5; }
+  button.btn-danger { background: #e74c3c; color: white; }
+  button.btn-warning { background: #f39c12; color: white; }
+  .result-box { background: #0f1117; border-radius: 8px; padding: 16px; font-size: 13px; line-height: 1.7; border: 1px solid #2d3142; white-space: pre-wrap; font-family: monospace; max-height: 400px; overflow-y: auto; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-right: 6px; }
+  .badge-red { background: #3d1515; color: #ff6b6b; }
+  .badge-yellow { background: #3d3115; color: #ffd166; }
+  .badge-green { background: #153d1e; color: #69db7c; }
+  .badge-blue { background: #152d3d; color: #74c0fc; }
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .stat { background: #0f1117; padding: 16px; border-radius: 8px; text-align: center; border: 1px solid #2d3142; }
+  .stat .value { font-size: 28px; font-weight: 700; color: #1877f2; }
+  .stat .label { font-size: 12px; color: #9aa0a6; margin-top: 4px; }
+  .post-item { background: #0f1117; border: 1px solid #2d3142; border-radius: 8px; padding: 14px; margin-bottom: 10px; }
+  .post-item .post-text { font-size: 13px; color: #9aa0a6; margin: 8px 0; }
+  .loader { text-align: center; padding: 40px; color: #9aa0a6; }
+  .loader::after { content: ''; display: block; width: 40px; height: 40px; margin: 16px auto 0; border: 3px solid #2d3142; border-top-color: #1877f2; border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .risk-critical { color: #ff6b6b; }
+  .risk-high { color: #ffa94d; }
+  .risk-medium { color: #ffd166; }
+  .risk-low { color: #69db7c; }
+  .toggle { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font-size: 14px; }
+  .toggle input[type=checkbox] { width: auto; margin: 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H9l3-7 3 7h-2v4h-2z"/></svg>
+  <div>
+    <h1>Facebook Report AI</h1>
+    <span>Content Moderation & Analysis Dashboard</span>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- Login Status -->
+  <div class="card" id="loginCard">
+    <h3>🔐 Facebook Session</h3>
+    <input type="email" id="fbEmail" placeholder="Facebook Email">
+    <input type="password" id="fbPassword" placeholder="Password">
+    <button class="btn btn-primary" onclick="doLogin()">Login & Save Session</button>
+    <div id="loginStatus" style="margin-top:10px;font-size:13px;color:#69db7c;"></div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('analyze-post')">📄 Post Analysis</button>
+    <button class="tab" onclick="switchTab('analyze-page')">📊 Page Report</button>
+    <button class="tab" onclick="switchTab('report-single')">🚩 Report Post</button>
+    <button class="tab" onclick="switchTab('bulk-report')">⚡ Bulk Report</button>
+  </div>
+
+  <!-- Panel: Analyze Single Post -->
+  <div class="panel active" id="panel-analyze-post">
+    <div class="card">
+      <h3>📄 Single Post Analysis</h3>
+      <input type="url" id="postUrl" placeholder="https://www.facebook.com/post/...">
+      <button class="btn btn-primary" onclick="analyzePost()">Analyze Post</button>
+    </div>
+    <div id="postResult"></div>
+  </div>
+
+  <!-- Panel: Analyze Page -->
+  <div class="panel" id="panel-analyze-page">
+    <div class="card">
+      <h3>📊 Page / Profile Analysis</h3>
+      <input type="url" id="pageUrl" placeholder="https://www.facebook.com/pagename">
+      <select id="pageLimit">
+        <option value="5">5 posts</option>
+        <option value="10" selected>10 posts</option>
+        <option value="20">20 posts</option>
+        <option value="30">30 posts</option>
+      </select>
+      <button class="btn btn-primary" onclick="analyzePage()">Generate Report</button>
+    </div>
+    <div id="pageResult"></div>
+  </div>
+
+  <!-- Panel: Report Single -->
+  <div class="panel" id="panel-report-single">
+    <div class="card">
+      <h3>🚩 Report Single Post</h3>
+      <input type="url" id="reportUrl" placeholder="https://www.facebook.com/post/...">
+      <select id="reportReason">
+        <option value="hate_speech">Hate Speech</option>
+        <option value="spam">Spam</option>
+        <option value="misinformation">Misinformation</option>
+        <option value="violence">Violence</option>
+        <option value="harassment">Harassment / Bullying</option>
+      </select>
+      <button class="btn btn-primary" onclick="reportSingle()">Report Post</button>
+    </div>
+    <div id="reportResult"></div>
+  </div>
+
+  <!-- Panel: Bulk Report -->
+  <div class="panel" id="panel-bulk-report">
+    <div class="card">
+      <h3>⚡ Bulk Analysis & Auto-Report</h3>
+      <input type="url" id="bulkPageUrl" placeholder="https://www.facebook.com/pagename">
+      <select id="bulkLimit">
+        <option value="5">5 posts</option>
+        <option value="10" selected>10 posts</option>
+        <option value="20">20 posts</option>
+      </select>
+      <div class="toggle">
+        <input type="checkbox" id="autoReport">
+        <label for="autoReport">Auto-report flagged posts (rate-limited, 35s delay)</label>
+      </div>
+      <button class="btn btn-primary" onclick="bulkReport()">Run Bulk Analysis</button>
+    </div>
+    <div id="bulkResult"></div>
+  </div>
+
+</div>
+
+<script>
+// API base URL — empty string means same origin (FastAPI serves this file)
+const API = '';
+
+function switchTab(id) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', ['analyze-post','analyze-page','report-single','bulk-report'][i] === id);
+  });
+  document.querySelectorAll('.panel').forEach(p => {
+    p.classList.toggle('active', p.id === 'panel-' + id);
+  });
+}
+
+async function api(endpoint, body) {
+  const r = await fetch(API + endpoint, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) {
+    const err = await r.json();
+    throw new Error(err.detail || 'Request failed');
+  }
+  return r.json();
+}
+
+function showLoader(el) {
+  el.innerHTML = '<div class="loader">Processing...</div>';
+}
+
+function riskBadge(level) {
+  const map = {critical:'badge-red',high:'badge-red',medium:'badge-yellow',low:'badge-green'};
+  return `<span class="badge ${map[level]||'badge-blue'}">${level?.toUpperCase()}</span>`;
+}
+
+async function doLogin() {
+  const email = document.getElementById('fbEmail').value;
+  const password = document.getElementById('fbPassword').value;
+  const status = document.getElementById('loginStatus');
+  status.textContent = 'Logging in...';
+  try {
+    const r = await api('/api/login', {email, password});
+    status.textContent = '✅ ' + r.message;
+  } catch(e) {
+    status.style.color = '#ff6b6b';
+    status.textContent = '❌ ' + e.message;
+  }
+}
+
+async function analyzePost() {
+  const url = document.getElementById('postUrl').value;
+  const el = document.getElementById('postResult');
+  showLoader(el);
+  try {
+    const r = await api('/api/analyze/post', {url});
+    el.innerHTML = renderPostAnalysis(r);
+  } catch(e) {
+    el.innerHTML = `<div class="card" style="color:#ff6b6b">❌ ${e.message}</div>`;
+  }
+}
+
+function renderPostAnalysis(r) {
+  return `
+<div class="card">
+  <h3>Analysis Result ${riskBadge(r.severity)}</h3>
+  <div style="margin-bottom:12px">
+    ${r.reportable ? '<span class="badge badge-red">⚠️ REPORTABLE</span>' : '<span class="badge badge-green">✅ CLEAN</span>'}
+    ${r.hate_speech ? '<span class="badge badge-red">Hate Speech</span>' : ''}
+    ${r.misinformation_risk ? '<span class="badge badge-yellow">Misinformation Risk</span>' : ''}
+    <span class="badge badge-blue">${r.sentiment}</span>
+  </div>
+  <div class="stat-grid">
+    <div class="stat"><div class="value">${(r.toxicity_score*100).toFixed(0)}%</div><div class="label">Toxicity</div></div>
+    <div class="stat"><div class="value">${(r.spam_score*100).toFixed(0)}%</div><div class="label">Spam Score</div></div>
+    <div class="stat"><div class="value risk-${r.severity}">${r.severity}</div><div class="label">Severity</div></div>
+  </div>
+  ${r.report_reason ? `<p style="font-size:13px;color:#ffd166;margin-bottom:8px">📌 Report Reason: ${r.report_reason}</p>` : ''}
+  <p style="font-size:13px;color:#9aa0a6">${r.summary || ''}</p>
+  ${r.post_text ? `<div class="result-box" style="margin-top:12px">${r.post_text}...</div>` : ''}
+</div>`;
+}
+
+async function analyzePage() {
+  const page_url = document.getElementById('pageUrl').value;
+  const limit = parseInt(document.getElementById('pageLimit').value);
+  const el = document.getElementById('pageResult');
+  showLoader(el);
+  try {
+    const r = await api('/api/analyze/page', {page_url, limit});
+    el.innerHTML = renderPageReport(r);
+  } catch(e) {
+    el.innerHTML = `<div class="card" style="color:#ff6b6b">❌ ${e.message}</div>`;
+  }
+}
+
+function renderPageReport(r) {
+  const posts = r.reportable_posts || [];
+  return `
+<div class="card">
+  <h3>Page Report ${riskBadge(r.risk_level)}</h3>
+  <div class="stat-grid">
+    <div class="stat"><div class="value">${r.total_posts_analyzed}</div><div class="label">Posts Analyzed</div></div>
+    <div class="stat"><div class="value" style="color:#ff6b6b">${r.reportable_count}</div><div class="label">Reportable</div></div>
+    <div class="stat"><div class="value">${r.reportable_percentage}%</div><div class="label">Report Rate</div></div>
+    <div class="stat"><div class="value">${(r.avg_toxicity_score*100).toFixed(0)}%</div><div class="label">Avg Toxicity</div></div>
+  </div>
+  <div style="background:#0f1117;border-radius:8px;padding:14px;margin:12px 0;font-size:13px;color:#c9d1d9;line-height:1.7">
+    <strong>AI Summary:</strong><br>${r.ai_summary}
+  </div>
+  ${posts.length > 0 ? `
+  <h3 style="margin-top:16px;margin-bottom:12px">Flagged Posts (${posts.length})</h3>
+  ${posts.map(p => `
+    <div class="post-item">
+      <div>${riskBadge(p.severity)} <span class="badge badge-blue">${p.report_category}</span></div>
+      <div class="post-text">${p.post_text || 'No text extracted'}...</div>
+      <small style="color:#9aa0a6">📌 ${p.report_reason || ''}</small>
+    </div>
+  `).join('')}` : ''}
+</div>`;
+}
+
+async function reportSingle() {
+  const url = document.getElementById('reportUrl').value;
+  const reason = document.getElementById('reportReason').value;
+  const el = document.getElementById('reportResult');
+  showLoader(el);
+  try {
+    const r = await api('/api/report/single', {url, reason});
+    el.innerHTML = `
+<div class="card">
+  <h3>${r.success ? '✅ Report Submitted' : '❌ Report Failed'}</h3>
+  <p style="font-size:13px;color:#9aa0a6;margin-top:8px">Steps: ${r.steps_completed?.join(' → ') || 'None'}</p>
+  ${r.error ? `<p style="color:#ff6b6b;font-size:13px;margin-top:8px">Error: ${r.error}</p>` : ''}
+</div>`;
+  } catch(e) {
+    el.innerHTML = `<div class="card" style="color:#ff6b6b">❌ ${e.message}</div>`;
+  }
+}
+
+async function bulkReport() {
+  const page_url = document.getElementById('bulkPageUrl').value;
+  const limit = parseInt(document.getElementById('bulkLimit').value);
+  const auto_report = document.getElementById('autoReport').checked;
+  const el = document.getElementById('bulkResult');
+  showLoader(el);
+  try {
+    const r = await api('/api/report/bulk', {page_url, limit, auto_report});
+    const report = r.analysis_report;
+    const actions = r.report_actions || [];
+    const successReports = actions.filter(a => a.success).length;
+    el.innerHTML = `
+${renderPageReport(report)}
+${actions.length > 0 ? `
+<div class="card">
+  <h3>⚡ Auto-Report Results: ${successReports}/${actions.length} successful</h3>
+  ${actions.map(a => `
+    <div class="post-item">
+      <span class="badge ${a.success ? 'badge-green' : 'badge-red'}">${a.success ? 'REPORTED' : 'FAILED'}</span>
+      <span style="font-size:12px;color:#9aa0a6;margin-left:8px">${a.url?.slice(0,60)}...</span>
+      ${a.error ? `<div style="font-size:12px;color:#ff6b6b;margin-top:4px">${a.error}</div>` : ''}
+    </div>
+  `).join('')}
+</div>` : ''}`;
+  } catch(e) {
+    el.innerHTML = `<div class="card" style="color:#ff6b6b">❌ ${e.message}</div>`;
+  }
+}
+</script>
+</body>
+</html>
